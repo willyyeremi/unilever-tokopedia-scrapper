@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  postgresql:
+    image: postgres:latest
+    container_name: postgresql_container
+    environment:
+      POSTGRES_DB: online_shop
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./database/postgresql:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+
+  airflow:
+    image: apache/airflow:2.5.0
+    container_name: airflow_container
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://admin:admin@postgresql:5432/airflow_database
+      AIRFLOW__CORE__FERNET_KEY: '4uBG5WCiywOYDzv_uesOLwXbL-CEx5PneA1FUZzTnFc='
+      AIRFLOW__WEBSERVER__SECRET_KEY: '7088a7040b2a62561888313540931945'
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'False'
+    depends_on:
+      - postgresql
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./pipeline/airflow:/opt/airflow/dags
+      - ./log/airflow:/opt/airflow/logs
+      - ./plugin/airflow:/opt/airflow/plugins
+      - ./pipeline/airflow/tokopedia_unilever_scrapping_pipeline:/opt/airflow/script/tokopedia_unilever_scrapping_pipeline
+      - ./credential.csv:/home/airflow/credential.csv
+      - ./pipeline/airflow/tokopedia_unilever_scrapping_pipeline/requirements.txt:/home/airflow/requirements.txt
+    command: >
+      bash -c "
+      pip install -r /home/airflow/requirements.txt &&
+      airflow db init && 
+      airflow users create --username admin --password admin --firstname admin --lastname admin --role Admin --email admin@example.com && 
+      airflow webserver &&
+      airflow scheduler
+      "
